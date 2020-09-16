@@ -140,9 +140,12 @@ class IdentityRule(EpsilonRule):
 
     Can be used for BatchNorm2D.
     """
+    # def _create_backward_hook_input(self, inputs):
+    #     def _backward_hook_input(grad):
+    #         return self.relevance_input
+    #
+    #     return _backward_hook_input
 
-    def _create_backward_hook_input(self, inputs):
-        def _backward_hook_input(grad):
-            return self.relevance_output
-
-        return _backward_hook_input
+class DistanceRule(EpsilonRule):
+    def forward_hook(self, module, inputs, outputs):
+        pass
