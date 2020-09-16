@@ -4,12 +4,16 @@ import warnings
 
 import torch
 import torch.nn as nn
+import efficientnet_pytorch.utils as en
+import efficientnet_pytorch
 
 from ..._utils.common import _format_input, _format_output, _run_forward
 from ..._utils.gradient import apply_gradient_requirements, undo_gradient_requirements
 from .._utils.attribution import GradientAttribution
 from .._utils.custom_modules import Addition_Module
-from .._utils.lrp_rules import EpsilonRule, PropagationRule
+from .._utils.lrp_rules import EpsilonRule, PropagationRule, IdentityRule, Alpha1_Beta0_Rule, DistanceRule
+# from src.models.deepsad.distance_module import Distance_Module
+from src.models.mahalanobis.mahalanobis_module import Mahalanobis_Module
 
 
 class LRP(GradientAttribution):
@@ -224,7 +228,11 @@ class LRP(GradientAttribution):
 
     def _get_layers(self, model):
         for layer in model.children():
-            if len(list(layer.children())) == 0:
+            if isinstance(layer, en.Conv2dStaticSamePadding):
+                self.layers.append(layer)
+            elif isinstance(layer, efficientnet_pytorch.model.MBConvBlock):
+                self.layers.append(layer)
+            elif len(list(layer.children())) == 0:
                 self.layers.append(layer)
             else:
                 self._get_layers(layer)
@@ -344,15 +352,26 @@ class LRP(GradientAttribution):
 
 
 SUPPORTED_LAYERS_WITH_RULES = {
-    nn.MaxPool1d: EpsilonRule,
-    nn.MaxPool2d: EpsilonRule,
-    nn.MaxPool3d: EpsilonRule,
-    nn.Conv2d: EpsilonRule,
+    nn.MaxPool1d: Alpha1_Beta0_Rule,
+    nn.Identity: IdentityRule,
+    nn.MaxPool2d: Alpha1_Beta0_Rule,
+    nn.MaxPool3d: Alpha1_Beta0_Rule,
+    nn.Conv2d: Alpha1_Beta0_Rule,
     nn.AvgPool2d: EpsilonRule,
     nn.AdaptiveAvgPool2d: EpsilonRule,
-    nn.Linear: EpsilonRule,
-    nn.BatchNorm2d: EpsilonRule,
-    Addition_Module: EpsilonRule,
+    nn.Linear: Alpha1_Beta0_Rule,
+    nn.BatchNorm2d: IdentityRule,
+    Addition_Module: Alpha1_Beta0_Rule,
+    en.Identity: IdentityRule,
+    en.MemoryEfficientSwish: EpsilonRule,
+    nn.ZeroPad2d: IdentityRule,
+    en.Swish: EpsilonRule,
+    en.Conv2dStaticSamePadding: EpsilonRule,
+    # Distance_Module: DistanceRule,
+    Mahalanobis_Module: DistanceRule,
+    efficientnet_pytorch.model.MBConvBlock: Alpha1_Beta0_Rule,
 }
+
+
 
 SUPPORTED_NON_LINEAR_LAYERS = [nn.ReLU, nn.Dropout, nn.Tanh]
